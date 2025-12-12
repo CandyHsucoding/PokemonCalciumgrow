@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>長高大富翁：寶可夢的成長冒險！</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+      body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif; }
+      #root { min-height: 100vh; display: flex; flex-direction: column; }
+      @keyframes pokeball-throw-custom {
+        0% { transform: rotate(0deg) scale(1); }
+        15% { transform: rotate(-15deg) translateY(-3px) scale(1.03); }
+        30% { transform: rotate(15deg) translateY(0px) scale(1.05); }
+        45% { transform: rotate(-10deg) translateY(-2px) scale(1.04); }
+        60% { transform: rotate(10deg) translateY(0px) scale(1.05); }
+        75% { transform: rotate(-5deg) translateY(-1px) scale(1.03); }
+        100% { transform: rotate(0deg) scale(1); }
+      }
+      .animate-pokeball-throw-custom {
+        animation: pokeball-throw-custom 0.1s linear infinite;
+      }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/"
+  }
+}
+</script>
+</head>
+<body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+    <script type="text/babel" data-presets="react,typescript">
+    
+    // --- 1. CONSTANTS & DEFINITIONS (Merged from types.ts and constants.ts) ---
+    // Using const objects instead of enums to prevent Babel ReferenceErrors in standalone mode
+    
+    const PokemonEvolutionStage = {
+      BABY: 'BABY',
+      CHILD: 'CHILD',
+      TEEN: 'TEEN',
+      ADULT: 'ADULT',
+    };
+
+    const TileType = {
+      START: 'START',
+      GENETIC_POSITIVE: 'GENETIC_POSITIVE', 
+      LIFESTYLE_POSITIVE: 'LIFESTYLE_POSITIVE', 
+      LIFESTYLE_NEGATIVE: 'LIFESTYLE_NEGATIVE', 
+      CHANCE_POSITIVE: 'CHANCE_POSITIVE', 
+      CHANCE_NEGATIVE: 'CHANCE_NEGATIVE', 
+      EVOLUTION_BOOST: 'EVOLUTION_BOOST', 
+    };
+
+    const GamePhase = {
+      SETUP: 'SETUP',
+      PLAYER_TURN_START: 'PLAYER_TURN_START',
+      KNOWLEDGE_QUESTION: 'KNOWLEDGE_QUESTION', 
+      AWAITING_DICE_ROLL: 'AWAITING_DICE_ROLL', 
+      DICE_ROLLING: 'DICE_ROLLING',
+      PLAYER_MOVING: 'PLAYER_MOVING',
+      EVENT_TRIGGERED: 'EVENT_TRIGGERED',
+      GAME_OVER: 'GAME_OVER',
+    };
+
+    const PLAYER_COLORS = [
+      'bg-pink-500',
+      'bg-blue-500',
+      'bg-green-500',
+      'bg-yellow-500',
+    ];
+
+    const PLAYER_COLOR_HEX_MAP = {
+      'bg-pink-500': { dicebear: 'ec4899', svg: '#ec4899' },  
+      'bg-blue-500': { dicebear: '3b82f6', svg: '#3b82f6' },  
+      'bg-green-500': { dicebear: '22c55e', svg: '#22c55e' }, 
+      'bg-yellow-500': { dicebear: 'eab308', svg: '#eab308' },
+    };
+
+    const PLAYER_AVATAR_URLS = [
+      'https://res.cloudinary.com/dma6wjetq/image/upload/v1750905937/ChatGPT_Image_2025%E5%B9%B46%E6%9C%8826%E6%97%A5_%E4%B8%8A%E5%8D%8810_59_28_zvxe2m.png',  
+      'https://res.cloudinary.com/dma6wjetq/image/upload/v1750905937/ChatGPT_Image_2025%E5%B9%B46%E6%9C%8826%E6%97%A5_%E4%B8%8A%E5%8D%8811_10_34_tgb5ex.png',    
+      'https://res.cloudinary.com/dma6wjetq/image/upload/v1750905936/ChatGPT_Image_2025%E5%B9%B46%E6%9C%8826%E6%97%A5_%E4%B8%8A%E5%8D%8811_13_43_k31g5o.png', 
+      'https://res.cloudinary.com/dma6wjetq/image/upload/v1750905936/ChatGPT_Image_2025%E5%B9%B46%E6%9C%8826%E6%97%A5_%E4%B8%8A%E5%8D%8811_15_54_sjyzao.png',    
+    ];
+
+    const DEFAULT_POKEMON = {
+      id: 'energymon', 
+      baseName: '夥伴怪獸', 
+      stages: {
+        [PokemonEvolutionStage.BABY]: { name: '初階夥伴', imageSeed: 'TinySpark', minPoints: 0 },
+        [PokemonEvolutionStage.CHILD]: { name: '中階夥伴', imageSeed: 'JoltPup', minPoints: 10 },
+        [PokemonEvolutionStage.TEEN]: { name: '高階夥伴', imageSeed: 'BoltMane', minPoints: 20 },
+        [PokemonEvolutionStage.ADULT]: { name: '最終夥伴', imageSeed: 'ThunderLord', minPoints: 30 },
+      },
+    };
+
+    const EVOLUTION_THRESHOLDS = {
+      [PokemonEvolutionStage.BABY]: 0,
+      [PokemonEvolutionStage.CHILD]: 10,
+      [PokemonEvolutionStage.TEEN]: 20,
+      [PokemonEvolutionStage.ADULT]: 30,
+    };
+
+    const GAME_EVENTS = [
+      { id: 'genetic1', type: TileType.GENETIC_POSITIVE, title: '遺傳優勢', description: '🧬 你遺傳到爸媽的高個基因！進化值 +3', points: 3, icon: '🧬' },
+      { id: 'genetic2', type: TileType.GENETIC_POSITIVE, title: '家族平均身高', description: '🧬 你的家族成員身高都蠻平均的。進化值 +1', points: 1, icon: '🧬' },
+      { id: 'lifestyle_sleep', type: TileType.LIFESTYLE_POSITIVE, title: '早睡早起', description: '💤 你每天準時10點上床睡覺！進化值 +2', points: 2, icon: '💤' },
+      { id: 'lifestyle_sport', type: TileType.LIFESTYLE_POSITIVE, title: '熱愛運動', description: '🏀 你參加籃球隊，每週運動3次！進化值 +2', points: 2, icon: '🏀' },
+      { id: 'lifestyle_diet', type: TileType.LIFESTYLE_POSITIVE, title: '均衡飲食', description: '🍎 你每天吃很多蔬菜水果，營養均衡！進化值 +2', points: 2, icon: '🍎' },
+      { id: 'lifestyle_mood', type: TileType.LIFESTYLE_POSITIVE, title: '心情愉快', description: '🎁 開心的一天！情緒穩定，有助成長！進化值 +1', points: 1, icon: '🎁' },
+      { id: 'lifestyle_stretch', type: TileType.LIFESTYLE_POSITIVE, title: '常做伸展操', description: '🤸 你常常做伸展運動，筋骨柔軟！進化值 +1', points: 1, icon: '🤸' },
+      { id: 'lifestyle_late_sleep', type: TileType.LIFESTYLE_NEGATIVE, title: '熬夜冠軍', description: '📱 你每天滑手機到半夜才睡！進化值 -3', points: -3, icon: '📱' },
+      { id: 'lifestyle_junk_food', type: TileType.LIFESTYLE_NEGATIVE, title: '垃圾食物愛好者', description: '🍟 你常吃炸雞加珍奶，點心都是高油高糖！進化值 -2', points: -2, icon: '🍟' },
+      { id: 'lifestyle_no_sport', type: TileType.LIFESTYLE_NEGATIVE, title: '懶得出門', description: '🛋️ 你放假都窩在家裡看電視，很少運動。進化值 -2', points: -2, icon: '🛋️' },
+      { id: 'lifestyle_picky_eater', type: TileType.LIFESTYLE_NEGATIVE, title: '挑食寶寶', description: '🥦 你不愛吃青菜，營養不均衡。進化值 -1', points: -1, icon: '🥦' },
+      { id: 'chance_growth_spurt', type: TileType.CHANCE_POSITIVE, title: '幸運時刻', description: '🌟 突然的成長期！進化值 +3', points: 3, icon: '🌟' },
+      { id: 'chance_good_luck', type: TileType.CHANCE_POSITIVE, title: '好運降臨', description: '🍀 撿到幸運草！進化值 +1', points: 1, icon: '🍀' },
+      { id: 'chance_sick', type: TileType.CHANCE_NEGATIVE, title: '不幸感冒', description: '🤒 不小心感冒了，影響食慾。進化值 -1', points: -1, icon: '🤒' },
+      { id: 'evo_boost1', type: TileType.EVOLUTION_BOOST, title: '進化能量點', description: '✨ 發現神秘的進化能量！進化值 +4', points: 4, icon: '✨' },
+    ];
+
+    const BOARD_TILES_COUNT = 12;
+
+    const BOARD_TILES = [
+      { id: 0, name: '起點', type: TileType.START, icon: '🏁', possibleEventIds: [] },
+      { id: 1, name: '先天基因', type: TileType.GENETIC_POSITIVE, icon: '🧬', possibleEventIds: ['genetic1', 'genetic2'] },
+      { id: 2, name: '生活習慣', type: TileType.LIFESTYLE_POSITIVE, icon: '💤', possibleEventIds: ['lifestyle_sleep', 'lifestyle_sport'] },
+      { id: 3, name: '機會卡', type: TileType.CHANCE_POSITIVE, icon: '🎁', possibleEventIds: ['chance_growth_spurt', 'chance_good_luck'] },
+      { id: 4, name: '不良習慣', type: TileType.LIFESTYLE_NEGATIVE, icon: '🍟', possibleEventIds: ['lifestyle_junk_food', 'lifestyle_no_sport'] },
+      { id: 5, name: '進化點', type: TileType.EVOLUTION_BOOST, icon: '✨', possibleEventIds: ['evo_boost1'] },
+      { id: 6, name: '先天基因', type: TileType.GENETIC_POSITIVE, icon: '🧬', possibleEventIds: ['genetic1', 'genetic2'] },
+      { id: 7, name: '生活習慣', type: TileType.LIFESTYLE_POSITIVE, icon: '🏀', possibleEventIds: ['lifestyle_diet', 'lifestyle_stretch'] },
+      { id: 8, name: '命運卡', type: TileType.CHANCE_NEGATIVE, icon: '❓', possibleEventIds: ['chance_sick'] },
+      { id: 9, name: '不良習慣', type: TileType.LIFESTYLE_NEGATIVE, icon: '📱', possibleEventIds: ['lifestyle_late_sleep', 'lifestyle_picky_eater'] },
+      { id: 10, name: '開心時刻', type: TileType.LIFESTYLE_POSITIVE, icon: '😊', possibleEventIds: ['lifestyle_mood'] },
+      { id: 11, name: '成長挑戰', type: TileType.CHANCE_POSITIVE, icon: '🎯', possibleEventIds: ['chance_growth_spurt'] },
+    ];
+
+    const MAX_TURNS_PER_PLAYER = 2;
+    const DICE_MIN = 1;
+    const DICE_MAX = 6;
+
+    const TILE_BG_COLORS = {
+      [TileType.START]: 'bg-yellow-400',
+      [TileType.GENETIC_POSITIVE]: 'bg-purple-300',
+      [TileType.LIFESTYLE_POSITIVE]: 'bg-green-300',
+      [TileType.LIFESTYLE_NEGATIVE]: 'bg-red-300',
+      [TileType.CHANCE_POSITIVE]: 'bg-blue-300',
+      [TileType.CHANCE_NEGATIVE]: 'bg-orange-300',
+      [TileType.EVOLUTION_BOOST]: 'bg-pink-400',
+    };
+
+    const GROWTH_KNOWLEDGE_QUESTIONS = [
+      {
+        id: 'q1',
+        questionText: '睡眠對長高重要嗎？',
+        options: [
+          { text: '非常重要', isCorrect: true },
+          { text: '不太重要', isCorrect: false },
+          { text: '完全不重要', isCorrect: false },
+        ],
+        feedbackCorrect: '答對了！充足的睡眠能促進生長激素分泌，幫助長高！',
+        feedbackIncorrect: '不對喔！睡眠是長高的黃金時間，每天要睡飽飽！',
+        bonusPoints: 1,
+      },
+      { id: 'q2', questionText: '哪種運動對長高最有幫助？', options: [{ text: '舉重', isCorrect: false }, { text: '籃球、跳繩', isCorrect: true }, { text: '馬拉松', isCorrect: false }], feedbackCorrect: '答對了！像籃球、跳繩這樣的跳躍性運動能刺激骨骼生長！', feedbackIncorrect: '再想想看！適度的跳躍和伸展運動對長高更好喔！', bonusPoints: 1 },
+      { id: 'q3', questionText: '常吃甜食會影響長高嗎？', options: [{ text: '不會，甜食很好吃', isCorrect: false }, { text: '會，過多糖分影響生長', isCorrect: true }, { text: '不一定，看體質', isCorrect: false }], feedbackCorrect: '答對了！過多糖分會影響鈣質吸收和生長激素分泌！', feedbackIncorrect: '小心！常吃甜食可能會讓你長不高喔！', bonusPoints: 1 },
+      { id: 'q4', questionText: '曬太陽有助於長高嗎？', options: [{ text: '會，能幫助身體合成維生素D', isCorrect: true }, { text: '不會，太陽只會曬黑皮膚', isCorrect: false }, { text: '不確定', isCorrect: false }], feedbackCorrect: '答對了！適度曬太陽能幫助身體合成維生素D，促進鈣質吸收，有助骨骼發育！', feedbackIncorrect: '其實適度曬太陽很重要喔！它能幫助身體製造長高必需的維生素D。', bonusPoints: 1 },
+      { id: 'q5', questionText: '均衡飲食對長高重要嗎？', options: [{ text: '還好，多喝牛奶就好', isCorrect: false }, { text: '非常重要，各種營養素都要攝取', isCorrect: true }, { text: '不重要，基因決定一切', isCorrect: false }], feedbackCorrect: '答對了！蛋白質、鈣質、維生素等各種營養素都是長高的重要基石！', feedbackIncorrect: '均衡飲食非常重要！只喝牛奶是不夠的，要攝取多樣化的食物才能健康長高。', bonusPoints: 1 },
+      { id: 'q6', questionText: '每天喝足夠的水對長高有幫助嗎？', options: [{ text: '有，水份參與身體各種代謝', isCorrect: true }, { text: '沒有，喝飲料比較好', isCorrect: false }, { text: '不確定，應該沒差', isCorrect: false }], feedbackCorrect: '答對了！充足的水分有助於維持身體正常機能，間接幫助成長。', feedbackIncorrect: '喝水很重要喔！身體需要足夠的水分來進行新陳代謝，這對成長也有幫助。', bonusPoints: 1 },
+      { id: 'q7', questionText: '鈣質主要來自哪些食物？', options: [{ text: '肉類和米飯', isCorrect: false }, { text: '牛奶、乳製品、小魚乾、深綠色蔬菜', isCorrect: true }, { text: '糖果和餅乾', isCorrect: false }], feedbackCorrect: '答對了！這些食物都是補充鈣質的好來源，有助於骨骼強壯！', feedbackIncorrect: '再想想看！牛奶、乳製品和一些蔬菜才是鈣質的主要來源喔。', bonusPoints: 1 },
+      { id: 'q8', questionText: '蛋白質對身體成長有什麼作用？', options: [{ text: '提供能量，像汽油一樣', isCorrect: false }, { text: '構成身體組織、修復細胞的主要材料', isCorrect: true }, { text: '幫助消化食物', isCorrect: false }], feedbackCorrect: '答對了！蛋白質是長高長壯的重要原料，就像蓋房子的磚塊！', feedbackIncorrect: '不對喔！蛋白質是構成我們身體肌肉、骨骼等組織的重要成分。', bonusPoints: 1 },
+      { id: 'q9', questionText: '保持良好姿勢（如站姿、坐姿）對身高有影響嗎？', options: [{ text: '有，良好姿勢有助於脊椎健康發展', isCorrect: true }, { text: '沒有，身高只跟基因有關', isCorrect: false }, { text: '不一定，舒服就好', isCorrect: false }], feedbackCorrect: '答對了！正確的姿勢能讓脊椎正常伸展，看起來更高挺，也有助於骨骼健康。', feedbackIncorrect: '姿勢其實很重要！駝背或姿勢不良可能會影響脊椎的健康生長。', bonusPoints: 1 },
+      { id: 'q10', questionText: '壓力太大會不會影響長高？', options: [{ text: '會，長期壓力可能影響生長激素分泌', isCorrect: true }, { text: '不會，讀書壓力是正常的', isCorrect: false }, { text: '不知道', isCorrect: false }], feedbackCorrect: '答對了！保持心情愉快，適時放鬆壓力，對身體成長也有幫助喔！', feedbackIncorrect: '是的，長期過大的壓力可能會間接影響到正常的生長發育，要學會放鬆心情！', bonusPoints: 1 },
+      { id: 'q11', questionText: '經常跳繩對長高有幫助嗎？', options: [{ text: '非常有幫助，能刺激生長板', isCorrect: true }, { text: '沒什麼用，只是好玩', isCorrect: false }, { text: '可能會受傷，不建議', isCorrect: false }], feedbackCorrect: '答對了！跳繩是很好的縱向運動，能刺激腳底和膝蓋的生長板！', feedbackIncorrect: '跳繩其實是很棒的長高運動喔！它能給予骨骼適度的刺激。', bonusPoints: 1 },
+      { id: 'q12', questionText: '哪種早餐對發育中的學生比較好？', options: [{ text: '不吃早餐，可以睡晚一點', isCorrect: false }, { text: '含蛋白質和全穀類的均衡早餐', isCorrect: true }, { text: '甜甜圈和含糖飲料', isCorrect: false }], feedbackCorrect: '答對了！均衡的早餐能提供一天所需的能量和營養，有助學習和成長！', feedbackIncorrect: '早餐很重要！選擇營養豐富的食物，才能讓你頭好壯壯、精力充沛。', bonusPoints: 1 },
+      { id: 'q13', questionText: '生長激素主要在什麼時候分泌最旺盛？', options: [{ text: '白天運動時', isCorrect: false }, { text: '晚上熟睡時', isCorrect: true }, { text: '考試前緊張時', isCorrect: false }], feedbackCorrect: '答對了！這就是為什麼早睡早起、睡得好對長高非常重要！', feedbackIncorrect: '記住囉！生長激素主要是在晚上睡覺時大量分泌的，所以要好好睡覺！', bonusPoints: 1 },
+      { id: 'q14', questionText: '抽菸或喝酒會影響青春期的身高發展嗎？', options: [{ text: '會嚴重影響，應該完全避免', isCorrect: true }, { text: '影響不大，偶爾沒關係', isCorrect: false }, { text: '不清楚，大人才需要擔心', isCorrect: false }], feedbackCorrect: '答對了！菸酒對發育中的身體有很多壞處，一定要遠離！', feedbackIncorrect: '非常重要！菸酒會對骨骼和整體健康造成負面影響，青春期千萬不能碰！', bonusPoints: 1 },
+      { id: 'q15', questionText: '除了牛奶，還有哪些食物富含鈣質有助於骨骼生長？', options: [{ text: '汽水和果汁', isCorrect: false }, { text: '豆腐、芝麻、杏仁、深綠色蔬菜（如芥蘭）', isCorrect: true }, { text: '洋芋片和巧克力', isCorrect: false }], feedbackCorrect: '答對了！多攝取這些食物，可以幫助你的骨骼更強壯！', feedbackIncorrect: '除了牛奶，豆腐、芝麻、小魚乾和深綠色蔬菜也是很好的鈣質來源喔！', bonusPoints: 1 },
+    ];
+
+    const QUESTION_CHANCE = 0.6;
+    const QUESTION_CORRECT_BONUS = 1;
+
+
+    // --- 3. COMPONENTS ---
+    
+    const { useState, useEffect, useCallback } = React;
+
+    // --- PokeballThrow.tsx ---
+    const PokeballIconDisplay = ({ isAnimating }) => (
+      <svg 
+        viewBox="0 0 100 100" 
+        className={`w-20 h-20 transition-transform duration-100 ${isAnimating ? 'animate-pokeball-throw-custom' : ''}`}
+      >
+        <circle cx="50" cy="50" r="45" fill="white" stroke="black" strokeWidth="4"/>
+        <path d="M 5 50 A 45 45 0 0 1 95 50 H 5 Z" fill="red"/>
+        <path d="M 5 50 A 45 45 0 0 0 95 50 H 5 Z" fill="white"/> 
+        <line x1="5" y1="50" x2="95" y2="50" stroke="black" strokeWidth="4"/>
+        <circle cx="50" cy="50" r="16" fill="white" stroke="black" strokeWidth="4"/>
+        <circle cx="50" cy="50" r="10" fill="lightgray" stroke="black" strokeWidth="0.5"/>
+      </svg>
+    );
+
+    const PokeballThrow = ({ onThrow, throwing, value }) => {
+      const [displayValue, setDisplayValue] = useState(1);
+      const [isVisuallyAnimating, setIsVisuallyAnimating] = useState(false);
+
+      useEffect(() => {
+        let intervalId = undefined;
+
+        if (throwing) {
+          setIsVisuallyAnimating(true);
+          intervalId = window.setInterval(() => {
+            setDisplayValue(Math.floor(Math.random() * (DICE_MAX - DICE_MIN + 1)) + DICE_MIN);
+          }, 60); 
+        } else {
+          setIsVisuallyAnimating(false);
+          if (value !== null) {
+            setDisplayValue(value);
+          } else {
+            setDisplayValue(1); 
+          }
+        }
+        return () => {
+          if (intervalId !== undefined) {
+            clearInterval(intervalId);
+          }
+        };
+      }, [throwing, value]); 
+
+      const handleThrowClick = () => {
+        const newValue = Math.floor(Math.random() * (DICE_MAX - DICE_MIN + 1)) + DICE_MIN;
+        onThrow(newValue);
+      };
+
+      return (
+        <div className="flex flex-col items-center my-4">
+          <div 
+            className="relative w-24 h-24 flex items-center justify-center"
+            aria-live="polite"
+            aria-label={`寶貝球投擲結果: ${displayValue}`}
+          >
+            <PokeballIconDisplay isAnimating={isVisuallyAnimating && throwing} />
+            <span 
+                className={`absolute text-4xl font-bold pointer-events-none ${ (isVisuallyAnimating && throwing) ? 'text-gray-700 opacity-90' : 'text-black' }`}
+                style={{ textShadow: '0 0 5px white, 0 0 5px white' }} 
+            >
+              {displayValue}
+            </span>
+          </div>
+          <button
+            onClick={handleThrowClick}
+            disabled={throwing} 
+            className="mt-3 px-6 py-2 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg shadow-md disabled:bg-gray-400 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-red-400"
+            aria-label="丟出寶貝球"
+          >
+            丟出寶貝球
+          </button>
+        </div>
+      );
+    };
+
+    // --- EventModal.tsx ---
+    const EventModal = ({ event, onClose }) => {
+      if (!event) return null;
+
+      const pointsColor = event.points >= 0 ? 'text-green-600' : 'text-red-600';
+      const pointsPrefix = event.points > 0 ? '+' : '';
+
+      return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-md transform transition-all duration-300 ease-out scale-100">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold text-purple-700">{event.title} {event.icon}</h2>
+              <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
+            <p className="text-gray-700 mb-4 text-lg">{event.description}</p>
+            <p className={`text-3xl font-bold mb-6 text-center ${pointsColor}`}>
+              進化值 {pointsPrefix}{event.points}
+            </p>
+            <button
+              onClick={onClose}
+              className="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-3 rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-yellow-400"
+            >
+              知道了！
+            </button>
+          </div>
+        </div>
+      );
+    };
+
+    // --- KnowledgeQuestionModal.tsx ---
+    const KnowledgeQuestionModal = ({ question, onAnswer, onClose }) => {
+      const [selectedOptionIndex, setSelectedOptionIndex] = useState(null);
+      const [showFeedback, setShowFeedback] = useState(false);
+      const [isCorrectAnswer, setIsCorrectAnswer] = useState(false);
+
+      useEffect(() => {
+        setSelectedOptionIndex(null);
+        setShowFeedback(false);
+        setIsCorrectAnswer(false);
+      }, [question]);
+
+      if (!question) return null;
+
+      const handleSubmitAnswer = (optionIndex) => {
+        setSelectedOptionIndex(optionIndex);
+        const correct = question.options[optionIndex].isCorrect;
+        setIsCorrectAnswer(correct);
+        setShowFeedback(true);
+      };
+
+      const handleContinue = () => {
+        onAnswer(isCorrectAnswer);
+      };
+
+      return (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50" role="dialog" aria-modal="true" aria-labelledby="question-title">
+          <div className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-lg transform transition-all duration-300 ease-out scale-100">
+            {!showFeedback ? (
+              <>
+                <h2 id="question-title" className="text-xl sm:text-2xl font-bold text-purple-700 mb-4">{question.questionText}</h2>
+                <div className="space-y-3 mb-6">
+                  {question.options.map((option, index) => (
+                    <button
+                      key={index}
+                      onClick={() => handleSubmitAnswer(index)}
+                      className={`w-full text-left p-3 rounded-lg border-2 transition-colors duration-200
+                                  ${selectedOptionIndex === index ? 'bg-yellow-200 border-yellow-500' : 'bg-gray-100 hover:bg-yellow-100 border-gray-300'}
+                                  focus:outline-none focus:ring-2 focus:ring-yellow-400`}
+                      aria-pressed={selectedOptionIndex === index}
+                    >
+                      {String.fromCharCode(65 + index)}. {option.text}
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="text-center">
+                <h2 className={`text-2xl sm:text-3xl font-bold mb-3 ${isCorrectAnswer ? 'text-green-600' : 'text-red-600'}`}>
+                  {isCorrectAnswer ? '答對了！🎉' : '答錯了...💧'}
+                </h2>
+                <p className="text-md sm:text-lg text-gray-700 mb-2">
+                  {isCorrectAnswer ? question.feedbackCorrect : question.feedbackIncorrect}
+                </p>
+                {isCorrectAnswer && question.bonusPoints && (
+                  <p className="text-lg font-semibold text-green-700 mb-4">
+                    進化值 +{question.bonusPoints}
+                  </p>
+                )}
+                <p className="text-sm text-gray-500 mb-4">
+                  {isCorrectAnswer ? '準備好擲骰子前進吧！' : '沒關係，下次加油！'}
+                </p>
+                <button
+                  onClick={handleContinue}
+                  className="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-3 rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                >
+                  {isCorrectAnswer ? '繼續遊戲' : '知道了'}
+                </button>
+              </div>
+            )}
+            {!showFeedback && (
+                <button 
+                    onClick={onClose} 
+                    className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 text-2xl"
+                    aria-label="關閉問題"
+                >
+                    &times;
+                </button>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    // --- PlayerDisplay.tsx ---
+    const PlayerDisplay = ({ player, isCurrentPlayer }) => {
+      const currentStageInfo = player.pokemon.stages[player.pokemonStage];
+      
+      const evolutionStagesOrdered = [
+        PokemonEvolutionStage.BABY, 
+        PokemonEvolutionStage.CHILD, 
+        PokemonEvolutionStage.TEEN, 
+        PokemonEvolutionStage.ADULT
+      ];
+      
+      const currentStageIndex = evolutionStagesOrdered.indexOf(player.pokemonStage);
+      let pointsForNextStageName = '已達最高型態';
+      let pointsForNextStageValue = EVOLUTION_THRESHOLDS[PokemonEvolutionStage.ADULT] + 10; 
+
+      if (currentStageIndex < evolutionStagesOrdered.length - 1) {
+        const nextStage = evolutionStagesOrdered[currentStageIndex + 1];
+        pointsForNextStageName = player.pokemon.stages[nextStage].name;
+        pointsForNextStageValue = EVOLUTION_THRESHOLDS[nextStage];
+      }
+
+      const pointsAtCurrentStageStart = EVOLUTION_THRESHOLDS[player.pokemonStage];
+      
+      const progressPercentage = (pointsForNextStageValue > pointsAtCurrentStageStart && player.growthPoints < pointsForNextStageValue) ?
+        Math.min(100, ((player.growthPoints - pointsAtCurrentStageStart) / (pointsForNextStageValue - pointsAtCurrentStageStart)) * 100)
+        : (player.growthPoints >= pointsForNextStageValue || player.pokemonStage === PokemonEvolutionStage.ADULT ? 100 : 0) ;
+
+      const pokemonImageSizeClass = player.pokemonStage === PokemonEvolutionStage.BABY ? 'w-16 h-16 sm:w-20 sm:h-20' : 
+                              player.pokemonStage === PokemonEvolutionStage.CHILD ? 'w-20 h-20 sm:w-24 sm:h-24' :
+                              player.pokemonStage === PokemonEvolutionStage.TEEN ? 'w-24 h-24 sm:w-28 sm:h-28' : 
+                              'w-28 h-28 sm:w-32 sm:h-32';
+
+      return (
+        <div className={`p-3 sm:p-4 border-4 rounded-lg shadow-lg transition-all duration-300 ${isCurrentPlayer ? 'border-yellow-400 scale-105 bg-white' : 'border-gray-300 bg-gray-50'}`}>
+          <div className="flex items-center mb-2">
+            <div className={`w-5 h-5 rounded-full ${player.color} mr-2 border-2 border-white shadow`}></div>
+            <h3 className="text-lg sm:text-xl font-bold text-gray-800">{player.name}</h3>
+          </div>
+          
+          <div className="flex items-center space-x-3">
+            <img 
+                src={player.avatarUrl} 
+                alt={`${player.name} 的頭像 (${currentStageInfo.name})`} 
+                className={`${pokemonImageSizeClass} rounded-full border-2 border-gray-400 shadow-md object-cover p-0.5 bg-gray-100`} 
+            />
+            <div>
+              <p className="text-sm sm:text-md font-semibold text-purple-700">{currentStageInfo.name}</p> 
+              <p className="text-xl sm:text-2xl font-bold text-orange-600">{player.growthPoints} <span className="text-sm">進化值</span></p>
+            </div>
+          </div>
+
+          <div className="mt-3">
+            <p className="text-xs text-gray-600 mb-1">
+              成長進度 (下一階段: {pointsForNextStageName})
+            </p>
+            <div className="w-full bg-gray-200 rounded-full h-4 sm:h-5 border border-gray-300 overflow-hidden">
+              <div
+                className="bg-green-500 h-full rounded-full text-xs text-white flex items-center justify-center transition-all duration-500 ease-out"
+                style={{ width: `${progressPercentage}%` }}
+                role="progressbar"
+                aria-label={`玩家 ${player.name} 的成長進度 ${Math.round(progressPercentage)}%`}
+              >
+              {player.growthPoints > 0 && progressPercentage > 10 && `${Math.round(progressPercentage)}%`}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // --- GameBoard.tsx ---
+    const PokeballToken = ({ player }) => {
+      const playerHexColor = PLAYER_COLOR_HEX_MAP[player.color]?.svg || '#cccccc'; 
+      const tokenSizeClasses = "w-5 h-5 sm:w-6 sm:h-6";
+
+      return (
+        <div 
+          className={`${tokenSizeClasses} rounded-full shadow-lg animate-pulse ring-1 ring-black/30 overflow-hidden`}
+          title={player.name}
+          style={{ animationDuration: `${1.5 + Math.random() * 0.5}s` }} 
+        >
+          <svg viewBox="0 0 100 100" className="w-full h-full">
+            <circle cx="50" cy="50" r="50" fill={playerHexColor} />
+            <rect x="0" y="45" width="100" height="10" fill="black" /> 
+            <circle cx="50" cy="50" r="18" fill="white" stroke="black" strokeWidth="2"/>
+            <circle cx="50" cy="50" r="11" fill={playerHexColor} stroke="black" strokeWidth="1.5" />
+            <circle cx="50" cy="50" r="8" fillOpacity="0.25" fill="white" />
+          </svg>
+        </div>
+      );
+    };
+
+    const BoardTile = ({ tile, playersOnTile }) => {
+      const bgColor = TILE_BG_COLORS[tile.type] || 'bg-gray-200';
+      return (
+        <div 
+          className={`w-24 h-24 sm:w-28 sm:h-28 border-2 border-gray-600 rounded-md flex flex-col items-center justify-center p-1 text-center shadow-md ${bgColor} relative`}
+          title={tile.name}
+        >
+          <div className="text-2xl sm:text-3xl mb-1">{tile.icon}</div>
+          <div className="text-xs sm:text-sm font-semibold">{tile.name}</div>
+          <div className="flex mt-1 absolute bottom-1 right-1 space-x-0.5 items-end">
+            {playersOnTile.map((p) => (
+              <PokeballToken key={p.id} player={p} />
+            ))}
+          </div>
+        </div>
+      );
+    };
+
+    const GameBoard = ({ tiles, players }) => {
+      const displayGrid = [
+        [tiles[0], tiles[1], tiles[2], tiles[3]],
+        [tiles[11], null, null, tiles[4]],
+        [tiles[10], null, null, tiles[5]],
+        [tiles[9], tiles[8], tiles[7], tiles[6]],
+      ];
+
+
+      return (
+        <div className="p-2 sm:p-4 bg-yellow-100 rounded-lg shadow-xl border-4 border-yellow-300">
+          <div className="grid grid-cols-4 gap-1 sm:gap-2">
+            {displayGrid.flat().map((tile, index) => {
+              if (!tile) {
+                return <div key={`empty-${index}`} className="w-24 h-24 sm:w-28 sm:h-28 rounded-md bg-yellow-50/50"></div>; 
+              }
+              const playersOnThisTile = players.filter(p => p.currentTileIndex === tile.id);
+              return <BoardTile key={tile.id} tile={tile} playersOnTile={playersOnThisTile} />;
+            })}
+          </div>
+        </div>
+      );
+    };
+
+    // --- GameSetup.tsx ---
+    const pokeballSvgDataUri = "data:image/svg+xml,%3Csvg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='50' cy='50' r='45' fill='white' stroke='black' stroke-width='4'/%3E%3Cpath d='M 5 50 A 45 45 0 0 1 95 50 H 5 Z' fill='red'/%3E%3Cpath d='M 5 50 A 45 45 0 0 0 95 50 H 5 Z' fill='white'/%3E%3Cline x1='5' y1='50' x2='95' y2='50' stroke='black' stroke-width='4'/%3E%3Ccircle cx='50' cy='50' r='16' fill='white' stroke='black' stroke-width='4'/%3E%3Ccircle cx='50' cy='50' r='10' fill='lightgray' stroke='black' stroke-width='0.5'/%3E%3C/svg%3E";
+
+    const GameSetup = ({ onSetupComplete }) => {
+      const playerCounts = [1, 2, 3, 4];
+      
+      return (
+        <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-green-300 via-yellow-200 to-pink-300 p-6">
+          <div className="bg-white p-8 rounded-xl shadow-2xl text-center max-w-lg w-full">
+            <img 
+              src={pokeballSvgDataUri} 
+              alt="長高大富翁 遊戲圖示 - 神奇寶貝球" 
+              className="mx-auto mb-6 rounded-full border-4 border-yellow-400 shadow-lg bg-gray-100 w-32 h-32 sm:w-40 sm:h-40 object-contain" 
+            />
+            <h1 className="text-3xl sm:text-4xl font-bold text-purple-700 mb-2">長高大富翁</h1>
+            <p className="text-lg text-gray-600 mb-8">寶可夢的成長冒險！</p>
+            
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">選擇玩家人數：</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+              {playerCounts.map(count => (
+                <button
+                  key={count}
+                  onClick={() => onSetupComplete(count)}
+                  className="px-6 py-4 bg-yellow-500 hover:bg-yellow-600 text-white font-bold text-lg rounded-lg shadow-md transition-transform transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                  aria-label={`選擇 ${count} 位玩家`}
+                >
+                  {count} {count === 1 ? '人' : '人'}
+                </button>
+              ))}
+            </div>
+            <p className="text-sm text-gray-500">遊戲時間約 3-5 分鐘。</p>
+          </div>
+        </div>
+      );
+    };
+
+    // --- GameOverScreen.tsx ---
+    const GameOverScreen = ({ players, onRestart }) => {
+      const sortedPlayers = [...players].sort((a, b) => b.growthPoints - a.growthPoints);
+
+      return (
+        <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-blue-300 via-indigo-200 to-purple-300 p-6 text-center">
+          <div className="bg-white p-8 rounded-xl shadow-2xl max-w-2xl w-full">
+            <h1 className="text-3xl sm:text-4xl font-bold text-purple-700 mb-6">遊戲結束！</h1>
+            
+            <div className="space-y-4 mb-8">
+              {sortedPlayers.map((player, index) => {
+                const stageInfo = player.pokemon.stages[player.pokemonStage];
+                const pokemonImageSizeClass = player.pokemonStage === PokemonEvolutionStage.BABY ? 'w-12 h-12 sm:w-16 sm:h-16' : 
+                                         player.pokemonStage === PokemonEvolutionStage.CHILD ? 'w-14 h-14 sm:w-20 sm:h-20' :
+                                         player.pokemonStage === PokemonEvolutionStage.TEEN ? 'w-16 h-16 sm:w-24 sm:h-24' : 
+                                         'w-20 h-20 sm:w-28 sm:h-28';
+                
+                return (
+                  <div key={player.id} className={`p-4 rounded-lg shadow-md flex items-center space-x-4 ${index === 0 ? 'bg-yellow-100 border-2 border-yellow-400' : 'bg-gray-100'}`}>
+                    <div className={`text-2xl font-bold ${index === 0 ? 'text-yellow-600' : 'text-gray-700'}`}>#{index + 1}</div>
+                    <img 
+                        src={player.avatarUrl} 
+                        alt={`${player.name} 的頭像 (${stageInfo.name})`} 
+                        className={`${pokemonImageSizeClass} rounded-full border-2 border-gray-300 object-cover bg-gray-100 p-0.5`}
+                    />
+                    <div className="text-left flex-grow">
+                      <p className="text-lg font-semibold text-gray-800">{player.name}</p>
+                      <p className="text-md text-purple-600">進化為：{stageInfo.name}</p> 
+                    </div>
+                    <p className="text-xl font-bold text-orange-600 ml-auto">{player.growthPoints} 進化值</p>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="bg-green-100 p-4 rounded-lg border border-green-300 mb-8">
+              <h2 className="text-xl font-semibold text-green-700 mb-2">成長小叮嚀：</h2>
+              <p className="text-md text-green-800">
+                恭喜你完成了成長冒險！無論你的寶可夢進化成什麼樣子，記得「先天基因影響身高，但後天努力更關鍵！」保持健康的生活習慣，均衡飲食、充足睡眠、適度運動，你就能長得更高更健康！
+              </p>
+            </div>
+
+            <button
+              onClick={onRestart}
+              className="px-8 py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-bold text-lg rounded-lg shadow-md transition-transform transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+              aria-label="重新開始遊戲"
+            >
+              重新開始
+            </button>
+          </div>
+        </div>
+      );
+    };
+
+    // --- App.tsx ---
+    const App = () => {
+      const [players, setPlayers] = useState([]);
+      const [currentPlayerIndex, setCurrentPlayerIndex] = useState(0);
+      const [currentThrowValue, setCurrentThrowValue] = useState(null);
+      const [activeEvent, setActiveEvent] = useState(null);
+      const [gamePhase, setGamePhase] = useState(GamePhase.SETUP);
+      const [totalTurnsPlayed, setTotalTurnsPlayed] = useState(0);
+      const [currentQuestion, setCurrentQuestion] = useState(null);
+      const [isQuestionModalVisible, setIsQuestionModalVisible] = useState(false);
+
+      const updatePlayerPokemonStage = useCallback((player) => {
+        let newStage = player.pokemonStage;
+        const stagesOrdered = [
+            PokemonEvolutionStage.BABY, 
+            PokemonEvolutionStage.CHILD, 
+            PokemonEvolutionStage.TEEN, 
+            PokemonEvolutionStage.ADULT
+        ];
+        
+        for (let i = stagesOrdered.length - 1; i >= 0; i--) {
+            const stageEnum = stagesOrdered[i];
+            if (player.growthPoints >= EVOLUTION_THRESHOLDS[stageEnum]) {
+                newStage = stageEnum;
+                break;
+            }
+        }
+        return { ...player, pokemonStage: newStage };
+      }, []);
+
+      const initializeGame = useCallback((numPlayers) => {
+        const newPlayers = [];
+        for (let i = 0; i < numPlayers; i++) {
+          newPlayers.push({
+            id: `player-${i + 1}`,
+            name: `玩家 ${i + 1}`,
+            pokemon: DEFAULT_POKEMON,
+            growthPoints: 0,
+            currentTileIndex: 0,
+            color: PLAYER_COLORS[i % PLAYER_COLORS.length],
+            avatarUrl: PLAYER_AVATAR_URLS[i % PLAYER_AVATAR_URLS.length], 
+            pokemonStage: PokemonEvolutionStage.BABY,
+          });
+        }
+        setPlayers(newPlayers.map(p => updatePlayerPokemonStage(p)));
+        setCurrentPlayerIndex(0);
+        setGamePhase(GamePhase.PLAYER_TURN_START);
+        setTotalTurnsPlayed(0);
+        setActiveEvent(null);
+        setCurrentThrowValue(null); 
+        setCurrentQuestion(null);
+        setIsQuestionModalVisible(false);
+      }, [updatePlayerPokemonStage]);
+
+      const handleSetupComplete = (numPlayers) => {
+        initializeGame(numPlayers);
+      };
+
+      const endTurn = useCallback(() => {
+        setActiveEvent(null); 
+        setIsQuestionModalVisible(false); 
+        setCurrentQuestion(null);
+
+        const nextPlayerIndex = (currentPlayerIndex + 1) % players.length;
+        let newTotalTurnsPlayed = totalTurnsPlayed;
+
+        if (nextPlayerIndex === 0 && players.length > 0) { 
+            newTotalTurnsPlayed = totalTurnsPlayed + 1;
+        }
+        
+        if (newTotalTurnsPlayed >= MAX_TURNS_PER_PLAYER) { 
+          setGamePhase(GamePhase.GAME_OVER);
+        } else {
+          setCurrentPlayerIndex(nextPlayerIndex);
+          setTotalTurnsPlayed(newTotalTurnsPlayed); 
+          setGamePhase(GamePhase.PLAYER_TURN_START);
+          setCurrentThrowValue(null); 
+        }
+      }, [totalTurnsPlayed, players.length, currentPlayerIndex]);
+
+      const handleTakeAction = () => {
+        if (Math.random() < QUESTION_CHANCE && GROWTH_KNOWLEDGE_QUESTIONS.length > 0) {
+          const randomIndex = Math.floor(Math.random() * GROWTH_KNOWLEDGE_QUESTIONS.length);
+          setCurrentQuestion(GROWTH_KNOWLEDGE_QUESTIONS[randomIndex]);
+          setIsQuestionModalVisible(true);
+          setGamePhase(GamePhase.KNOWLEDGE_QUESTION);
+        } else {
+          setGamePhase(GamePhase.AWAITING_DICE_ROLL); 
+        }
+      };
+
+      const handleQuestionAnswer = useCallback((isCorrect) => {
+        setIsQuestionModalVisible(false); 
+        
+        let playerToUpdate = players[currentPlayerIndex];
+
+        if (isCorrect) {
+          const bonus = currentQuestion?.bonusPoints ?? QUESTION_CORRECT_BONUS;
+          playerToUpdate = { ...playerToUpdate, growthPoints: Math.max(0, playerToUpdate.growthPoints + bonus) };
+          playerToUpdate = updatePlayerPokemonStage(playerToUpdate);
+          
+          setPlayers(prevPlayers => prevPlayers.map((p, index) => index === currentPlayerIndex ? playerToUpdate : p));
+          setCurrentQuestion(null); 
+          setGamePhase(GamePhase.AWAITING_DICE_ROLL); 
+        } else {
+          setCurrentQuestion(null); 
+          endTurn(); 
+        }
+      }, [players, currentPlayerIndex, currentQuestion, updatePlayerPokemonStage, endTurn]);
+      
+      const handleQuestionModalClose = useCallback(() => {
+        setIsQuestionModalVisible(false);
+        if(gamePhase === GamePhase.KNOWLEDGE_QUESTION && currentQuestion) { 
+            endTurn(); 
+        }
+        setCurrentQuestion(null);
+      }, [gamePhase, currentQuestion, endTurn]);
+
+      const performThrowAndMove = useCallback((throwValue) => {
+        setCurrentThrowValue(throwValue);
+        setGamePhase(GamePhase.DICE_ROLLING); 
+
+        setTimeout(() => { 
+          setGamePhase(GamePhase.PLAYER_MOVING);
+          const currentPlayer = players[currentPlayerIndex];
+          const currentTileValidIndex = typeof currentPlayer.currentTileIndex === 'number' ? currentPlayer.currentTileIndex : 0;
+          const newTileIndex = (currentTileValidIndex + throwValue) % BOARD_TILES_COUNT;
+          
+          let updatedPlayers = players.map((p, index) => 
+            index === currentPlayerIndex ? { ...p, currentTileIndex: newTileIndex } : p
+          );
+          setPlayers(updatedPlayers.map(p => updatePlayerPokemonStage(p)));
+
+          setTimeout(() => { 
+            const currentTile = BOARD_TILES.find(tile => tile.id === newTileIndex);
+            if (currentTile && currentTile.type !== TileType.START && currentTile.possibleEventIds.length > 0) {
+              const randomEventId = currentTile.possibleEventIds[Math.floor(Math.random() * currentTile.possibleEventIds.length)];
+              const event = GAME_EVENTS.find(e => e.id === randomEventId);
+              if (event) {
+                setActiveEvent(event);
+                setGamePhase(GamePhase.EVENT_TRIGGERED);
+                
+                setPlayers(prevPlayers => prevPlayers.map((p, index) => {
+                  if (index === currentPlayerIndex) {
+                    const updatedPlayer = { ...p, growthPoints: Math.max(0, p.growthPoints + event.points) };
+                    return updatePlayerPokemonStage(updatedPlayer); 
+                  }
+                  return p;
+                }));
+              } else { 
+                endTurn(); 
+              }
+            } else { 
+              endTurn(); 
+            }
+          }, 500); 
+        }, 700); 
+      }, [players, currentPlayerIndex, updatePlayerPokemonStage, endTurn]);
+
+      const handleEventModalClose = () => {
+        setActiveEvent(null);
+        endTurn();
+      };
+      
+      const handleRestartGame = () => {
+        setGamePhase(GamePhase.SETUP);
+      };
+
+      if (gamePhase === GamePhase.SETUP) {
+        return <GameSetup onSetupComplete={handleSetupComplete} />;
+      }
+
+      if (gamePhase === GamePhase.GAME_OVER) {
+        return <GameOverScreen players={players} onRestart={handleRestartGame} />;
+      }
+      
+      if (players.length === 0) {
+        return <div className="flex items-center justify-center h-screen text-xl">載入遊戲中...</div>;
+      }
+
+      const currentPlayer = players[currentPlayerIndex];
+      const roundNumber = totalTurnsPlayed + 1; 
+
+      let turnStatusText = `回合 ${roundNumber} - ${currentPlayer.name} 的回合`;
+      if (gamePhase === GamePhase.DICE_ROLLING) {
+        turnStatusText = `${currentPlayer.name} 寶貝球投擲中...`;
+      } else if (gamePhase === GamePhase.PLAYER_MOVING) {
+        turnStatusText = `${currentPlayer.name} 移動中...`;
+      } else if (gamePhase === GamePhase.KNOWLEDGE_QUESTION && currentQuestion) {
+        turnStatusText = `${currentPlayer.name} 請回答問題！`;
+      } else if (gamePhase === GamePhase.AWAITING_DICE_ROLL) {
+        turnStatusText = `${currentPlayer.name} 請丟出寶貝球！`;
+      } else if (gamePhase === GamePhase.EVENT_TRIGGERED && activeEvent) {
+        turnStatusText = `${currentPlayer.name} 觸發了事件：${activeEvent.title}`;
+      }
+
+
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-purple-200 via-pink-200 to-yellow-100 flex flex-col items-center justify-center p-2 sm:p-4 selection:bg-yellow-300">
+          <div className="w-full max-w-5xl mx-auto">
+            <header className="mb-4 text-center">
+              <h1 className="text-3xl sm:text-4xl font-bold text-purple-700">長高大富翁</h1>
+              <p className="text-md sm:text-lg text-purple-500">寶可夢的成長冒險！</p>
+              <p className="text-sm text-gray-600 mt-1">{turnStatusText}</p>
+            </header>
+
+            <main className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <div className="lg:col-span-2 order-2 lg:order-1">
+                <GameBoard tiles={BOARD_TILES} players={players} />
+              </div>
+
+              <div className="lg:col-span-1 order-1 lg:order-2 space-y-3">
+                {players.map((player, index) => (
+                  <PlayerDisplay 
+                    key={player.id} 
+                    player={player} 
+                    isCurrentPlayer={index === currentPlayerIndex} 
+                  />
+                ))}
+              </div>
+            </main>
+
+            <footer className="mt-4 text-center">
+              {gamePhase === GamePhase.PLAYER_TURN_START && (
+                <button
+                  onClick={handleTakeAction}
+                  className="px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-bold rounded-lg shadow-lg text-lg transform transition hover:scale-105"
+                >
+                  開始行動！
+                </button>
+              )}
+
+              {gamePhase === GamePhase.AWAITING_DICE_ROLL && (
+                <PokeballThrow 
+                  onThrow={performThrowAndMove} 
+                  throwing={false} 
+                  value={currentThrowValue} 
+                />
+              )}
+
+              {(gamePhase === GamePhase.DICE_ROLLING) && (
+                <PokeballThrow 
+                  onThrow={() => {}} 
+                  throwing={true}  
+                  value={currentThrowValue} 
+                />
+              )}
+
+            </footer>
+          </div>
+
+          {activeEvent && gamePhase === GamePhase.EVENT_TRIGGERED && (
+            <EventModal event={activeEvent} onClose={handleEventModalClose} />
+          )}
+
+          {isQuestionModalVisible && currentQuestion && gamePhase === GamePhase.KNOWLEDGE_QUESTION && (
+            <KnowledgeQuestionModal 
+                question={currentQuestion} 
+                onAnswer={handleQuestionAnswer} 
+                onClose={handleQuestionModalClose} 
+            />
+          )}
+        </div>
+      );
+    };
+
+    // --- Mount ---
+    const rootElement = document.getElementById('root');
+    const root = ReactDOM.createRoot(rootElement);
+    root.render(
+      <React.StrictMode>
+        <App />
+      </React.StrictMode>
+    );
+
+    </script>
+</body>
+</html>
